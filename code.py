@@ -1,6 +1,6 @@
 """
 Raspberry pi Pico W weather station
-Circuitpython 8.03
+Circuitpython 8.05
 version: 0.3
 Author: AD
 2023-05-08
@@ -34,13 +34,10 @@ windCount = 0
 rainCount = 0
 RADIUS = 9.0
 BUCKET_SIZE = 0.2794
-#WIND_INT = 5 # interval to calculate mean wind speed
+# WIND_INT = 5 # interval to calculate mean wind speed
 RECORD_INT = 60 # interval to calculate mean and max wind speed
 REPORTING_INT = 510 # reporting interval
-MY_TZ_OFFSET = 0 #GMT
-
-#store_speeds = []
-#store_directions = []
+MY_TZ_OFFSET = 0 # GMT
 
 bme280_addr = 0x77
 veml_addr = 0x10
@@ -149,11 +146,11 @@ def read_batt():
         print("Failed to read battery\n", e)
         nap_time(300)
 
-#Calculate Wind Direction and return as a a string
+# Calculate Wind Direction and return as a a string
 def calculate_wind_direction():
     s = "N/A"
     deg = 999.9
-    reading = windDir.value / 64 #Read A0, convert to 10-bit (0-1023)
+    reading = windDir.value / 64 # Read A0, convert to 10-bit (0-1023)
 
     if 250 <= reading <= 284:
         s = "ESE"
@@ -212,18 +209,18 @@ def calculate_wind_direction():
 # rain gauge
 def get_rain():
     global rainInput, rainFlag
-    if(rainInput.value == 0 and rainFlag == 1): #Compare to our flag to look for a LOW transit
-        global rainCount #Ensure we write to the global count variable
-        rainCount += 1 #Since the sensor has transited low, increase the count by 1
-    rainFlag = rainInput.value #Set our flag to match our input
+    if(rainInput.value == 0 and rainFlag == 1): # Compare to our flag to look for a LOW transit
+        global rainCount # Ensure we write to the global count variable
+        rainCount += 1 # Since the sensor has transited low, increase the count by 1
+    rainFlag = rainInput.value # Set our flag to match our input
 
 # anemometer
 def get_wind():
     global windInput, windFlag
-    if(windInput.value ==  0 and windFlag == 1): #Compare to our flag to look for a LOW transit
-        global windCount #Ensure we write to the global count variable
-        windCount += 1 #Since the sensor has transited low, increase the count by 1
-    windFlag = windInput.value #Set our flag to match our input
+    if(windInput.value ==  0 and windFlag == 1): # Compare to our flag to look for a LOW transit
+        global windCount # Ensure we write to the global count variable
+        windCount += 1 # Since the sensor has transited low, increase the count by 1
+    windFlag = windInput.value # Set our flag to match our input
 
 # return windspeed mph
 def calculate_speed(windcount, time_sec, radius_cm):
@@ -270,9 +267,9 @@ start_time = time.time()
 while time.time() - start_time <= RECORD_INT:
     get_rain()
     get_wind()
-    #wind_start_time = time.time()
-    #while time.time() - wind_start_time <= WIND_INT:
-    #    pass
+    # wind_start_time = time.time()
+    # while time.time() - wind_start_time <= WIND_INT:
+    #     pass
 
 gc.collect()
 bmeDat = read_bme()
@@ -284,7 +281,7 @@ batDat = read_batt()
 now = time.localtime()
 rainfall = round(rainCount * BUCKET_SIZE, 2)
 windHeading = calculate_wind_direction()
-#print(windHeading)
+# print(windHeading)
 measuredWind = round(calculate_speed(windCount, RECORD_INT, RADIUS), 2)
 timestamp = "{0:04d}-{1:02d}-{2:02d} {3:02d}:{4:02d}:{5:02d}".format(now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
 freemem = gc.mem_free()
@@ -293,7 +290,6 @@ payload = {'DATETIME': timestamp,
            'TEMP': bmeDat[0],
            'DEWPNT': dewpnt,
            'HUMID': bmeDat[1],
-           #'PRESS': bmeDat[2],
            'PRESS': atmosPr,
            'LIGHT': lightDat[0],
            'LUX': lightDat[1],
@@ -305,7 +301,7 @@ payload = {'DATETIME': timestamp,
            'BATVOLT': batDat[0],
            'BATPERC': batDat[1]
            }
-#print(payload)
+# print(payload)
 push_mqtt(payload)
 
 rainCount = 0
