@@ -6,6 +6,8 @@ Author: AD
 2023-05-08
 
 Collect sensor data and send to MQTT broker on raspberry pi using MiniMQTT
+TODO: Add loging
+TODO: Add RTC?
 """
 import board
 import os
@@ -34,9 +36,8 @@ windCount = 0
 rainCount = 0
 RADIUS = 9.0
 BUCKET_SIZE = 0.2794
-# WIND_INT = 5 # interval to calculate mean wind speed
-RECORD_INT = 60 # interval to calculate mean and max wind speed
-REPORTING_INT = 510 # reporting interval
+RECORD_INT = 60 # interval to calculate mean and max wind speed 120, 180
+REPORTING_INT = 510 # reporting interval 450, 330
 MY_TZ_OFFSET = 0 # GMT
 
 bme280_addr = 0x77
@@ -45,7 +46,7 @@ max_addr = 0x36
 
 def take_nap(nap_duration):
   time_alarm = alarm.time.TimeAlarm(monotonic_time=time.monotonic() + nap_duration)
-  #print("Sleeping for: {0}".format(time_alarm.monotonic_time - time.monotonic()))
+  # print("Sleeping for: {0}".format(time_alarm.monotonic_time - time.monotonic()))
   alarm.exit_and_deep_sleep_until_alarms(time_alarm)
 
 def connect_wifi():
@@ -68,7 +69,7 @@ def push_mqtt(payload):
 
 # create I2C bus
 try:
-    i2c = I2C(scl=board.GP17, sda=board.GP16, frequency=200_000)
+    i2c = I2C(scl = board.GP17, sda = board.GP16, frequency = 200_000)
     tsl_b280 = adafruit_bme280.Adafruit_BME280_I2C(i2c, bme280_addr)  # address = 0x77
     tsl_veml = adafruit_veml7700.VEML7700(i2c, veml_addr)   # address = 0x10
 except Exception as e:
@@ -77,7 +78,7 @@ except Exception as e:
 
 # create I2C2 bus - battery monitor
 try:
-    i2c2 = I2C(scl=board.GP19, sda=board.GP18, frequency=200_000)
+    i2c2 = I2C(scl = board.GP19, sda = board.GP18, frequency = 200_000)
     maxBat = adafruit_max1704x.MAX17048(i2c2, max_addr)  # address = 0x36
 except Exception as e:
     print("I2C exception occured!\n", e)
@@ -86,13 +87,13 @@ except Exception as e:
 # add rain gauge
 rainInput = DigitalInOut(board.GP3)
 rainInput.direction = Direction.INPUT
-rainInput.switch_to_input(pull=Pull.UP)
+rainInput.switch_to_input(pull = Pull.UP)
 rainFlag = 0
 
 # add Anenometer
 windInput = DigitalInOut(board.GP4)
 windInput.direction = Direction.INPUT
-windInput.switch_to_input(pull=Pull.UP)
+windInput.switch_to_input(pull = Pull.UP)
 windFlag = 0
 
 # add wind vane
@@ -104,21 +105,21 @@ mqtt_topic = "pico_data"
 
 # define callback methods
 def connect(mqtt_client, userdata, flags, rc):
-    print("Connected to MQTT broker on topic    %s" % mqtt_root_topic+mqtt_topic)
+    print("Connected to MQTT broker on topic    %s" % mqtt_root_topic + mqtt_topic)
     print("Flags: {0}\n RC: {1}".format(flags, rc))
 
 def disconnect(mqtt_client, userdata, rc):
     print("Disconnected from MQTT Broker!")
 
 def publish(mqtt_client, userdata, topic, pid):
-    print("Published to {0} with PID {1}".format(mqtt_root_topic+mqtt_topic, pid))
+    print("Published to {0} with PID {1}".format(mqtt_root_topic + mqtt_topic, pid))
 
 # read BME280 sensor
 def read_bme():
     try:
         temp = round(tsl_b280.temperature, 2)
-        humid = round(tsl_b280.humidity ,2)
-        press = round(tsl_b280.pressure,2)
+        humid = round(tsl_b280.humidity, 2)
+        press = round(tsl_b280.pressure, 2)
         time.sleep(1)
         return(temp, humid, press)
         gc.collect()
@@ -218,9 +219,9 @@ def get_rain():
 def get_wind():
     global windInput, windFlag
     if(windInput.value ==  0 and windFlag == 1): # Compare to our flag to look for a LOW transit
-        global windCount # Ensure we write to the global count variable
-        windCount += 1 # Since the sensor has transited low, increase the count by 1
-    windFlag = windInput.value # Set our flag to match our input
+        global windCount
+        windCount += 1
+    windFlag = windInput.value
 
 # return windspeed mph
 def calculate_speed(windcount, time_sec, radius_cm):
@@ -267,9 +268,6 @@ start_time = time.time()
 while time.time() - start_time <= RECORD_INT:
     get_rain()
     get_wind()
-    # wind_start_time = time.time()
-    # while time.time() - wind_start_time <= WIND_INT:
-    #     pass
 
 gc.collect()
 bmeDat = read_bme()
@@ -279,9 +277,8 @@ gc.collect()
 lightDat = read_light()
 batDat = read_batt()
 now = time.localtime()
-rainfall = round(rainCount * BUCKET_SIZE, 2)
+rainfall = round(rainCount * BUCKET_SIZE, 3)
 windHeading = calculate_wind_direction()
-# print(windHeading)
 measuredWind = round(calculate_speed(windCount, RECORD_INT, RADIUS), 2)
 timestamp = "{0:04d}-{1:02d}-{2:02d} {3:02d}:{4:02d}:{5:02d}".format(now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
 freemem = gc.mem_free()
