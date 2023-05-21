@@ -1,7 +1,7 @@
 """
 Raspberry pi Pico W weather station
 Circuitpython 8.05
-version: 0.3
+version: 0.4
 Author: AD
 2023-05-21
 
