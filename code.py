@@ -3,7 +3,7 @@ Raspberry pi Pico W weather station
 Circuitpython 8.05
 version: 0.3
 Author: AD
-2023-05-08
+2023-05-21
 
 Collect sensor data and send to MQTT broker on raspberry pi using MiniMQTT
 TODO: Add loging
