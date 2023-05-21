@@ -36,8 +36,8 @@ windCount = 0
 rainCount = 0
 RADIUS = 9.0
 BUCKET_SIZE = 0.2794
-RECORD_INT = 180 # interval to calculate mean and max wind speed 120, 180
-REPORTING_INT = 330 # reporting interval 450, 330
+RECORD_INT = 180 # interval to calculate mean and max wind speed 60, 120, 180
+REPORTING_INT = 330 # reporting interval 510, 450, 330
 MY_TZ_OFFSET = 0 # GMT
 
 bme280_addr = 0x77
