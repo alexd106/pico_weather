@@ -6,7 +6,7 @@ Author: AD
 2023-05-21
 
 Collect sensor data and send to MQTT broker on raspberry pi using MiniMQTT
-TODO: Add loging
+TODO: Add loging?
 TODO: Add RTC?
 """
 import board
@@ -36,13 +36,19 @@ windCount = 0
 rainCount = 0
 RADIUS = 9.0
 BUCKET_SIZE = 0.2794
-RECORD_INT = 180 # interval to calculate mean and max wind speed 60, 120, 180
+RECORD_INT = 180 # interval to calculate wind speed and rainfall 60, 120, 180
 REPORTING_INT = 330 # reporting interval 510, 450, 330
-MY_TZ_OFFSET = 0 # GMT
+# MY_TZ_OFFSET = 0 # GMT
 
 bme280_addr = 0x77
 veml_addr = 0x10
 max_addr = 0x36
+
+# MQTT topics
+mqtt_root_topic = "pico_sensor/"
+mqtt_topic = "pico_data"
+mqtt_alarm_topic = "alarm"
+
 
 def take_nap(nap_duration):
   time_alarm = alarm.time.TimeAlarm(monotonic_time=time.monotonic() + nap_duration)
@@ -56,16 +62,56 @@ def connect_wifi():
         print("Connected to WiFi")
     except Exception as e:
         print("Cannot connect to wifi\n", e)
-        take_nap(300)
+        take_nap(180)
 
 def push_mqtt(payload):
     try:
         mqtt_client.connect()
         mqtt_client.loop()
-        mqtt_client.publish(mqtt_root_topic+mqtt_topic, dumps(payload))
+        mqtt_client.publish(mqtt_root_topic + mqtt_topic, dumps(payload))
     except Exception as e:
-        print("MQTT failed\n", e)
-        take_nap(300)
+        print("MQTT message failed\n", e)
+        take_nap(180)
+
+def push_mqtt_alarm(payload):
+    try:
+        mqtt_client.connect()
+        mqtt_client.loop()
+        mqtt_client.publish(mqtt_root_topic + mqtt_alarm_topic, dumps(payload))
+    except Exception as e:
+        print("MQTT alarm message failed\n", e)
+        take_nap(180)
+
+# define callback methods
+def connect(mqtt_client, userdata, flags, rc):
+    print("Connected to MQTT broker on root topic %s" % mqtt_root_topic)
+    print("Flags: {0}\n RC: {1}".format(flags, rc))
+
+def disconnect(mqtt_client, userdata, rc):
+    print("Disconnected from MQTT Broker!")
+
+def publish(mqtt_client, userdata, topic, pid):  # check this is working
+    if topic == mqtt_root_topic + mqtt_topic:
+        print("Published to topic {0} with PID {1}".format(mqtt_root_topic + mqtt_topic, pid))
+    else:
+        print("Published to topic {0} with PID {1}".format(mqtt_root_topic + mqtt_alarm_topic, pid))
+
+connect_wifi()
+pool = socketpool.SocketPool(wifi.radio)
+
+# set up a MQTT Client
+mqtt_client = MQTT.MQTT(
+    broker = os.getenv('BROKER_IP'),
+    port = os.getenv('BROKER_PORT'),
+    username = os.getenv('BROKER_USR'),
+    password = os.getenv('BROKER_PASSWD'),
+    socket_pool = pool)
+
+# connect callback handlers to mqtt_client
+mqtt_client.on_connect = connect
+mqtt_client.on_disconnect = disconnect
+mqtt_client.on_publish = publish
+gc.collect()
 
 # create I2C bus
 try:
@@ -74,15 +120,19 @@ try:
     tsl_veml = adafruit_veml7700.VEML7700(i2c, veml_addr)   # address = 0x10
 except Exception as e:
     print("I2C exception occured!\n", e)
-    take_nap(300)
+    alarm_payload = {'ALARM': 'I2C exception occured'}
+    push_mqtt_alarm(alarm_payload)
+    take_nap(180)
 
 # create I2C2 bus - battery monitor
 try:
     i2c2 = I2C(scl = board.GP19, sda = board.GP18, frequency = 200_000)
     maxBat = adafruit_max1704x.MAX17048(i2c2, max_addr)  # address = 0x36
 except Exception as e:
-    print("I2C exception occured!\n", e)
-    take_nap(300)
+    print("I2C2 exception occured!\n", e)
+    alarm_payload = {'ALARM': 'I2C2 exception occured'}
+    push_mqtt_alarm(alarm_payload)
+    take_nap(180)
 
 # add rain gauge
 rainInput = DigitalInOut(board.GP3)
@@ -99,21 +149,6 @@ windFlag = 0
 # add wind vane
 windDir = AnalogIn(board.GP26)
 
-# MQTT topics
-mqtt_root_topic = "pico_sensor/"
-mqtt_topic = "pico_data"
-
-# define callback methods
-def connect(mqtt_client, userdata, flags, rc):
-    print("Connected to MQTT broker on topic    %s" % mqtt_root_topic + mqtt_topic)
-    print("Flags: {0}\n RC: {1}".format(flags, rc))
-
-def disconnect(mqtt_client, userdata, rc):
-    print("Disconnected from MQTT Broker!")
-
-def publish(mqtt_client, userdata, topic, pid):
-    print("Published to {0} with PID {1}".format(mqtt_root_topic + mqtt_topic, pid))
-
 # read BME280 sensor
 def read_bme():
     try:
@@ -125,7 +160,9 @@ def read_bme():
         gc.collect()
     except Exception as e:
         print("Failed to read BME280 sensor\n", e)
-        take_nap(300)
+        alarm_payload = {'ALARM': 'BME280 exception occured'}
+        push_mqtt_alarm(alarm_payload)
+        take_nap(180)
 
 # read VEML7700 light sensor
 def read_light():
@@ -135,7 +172,9 @@ def read_light():
         return(amb_light, lux)
     except Exception as e:
         print("Failed to read VEML7700 sensor\n", e)
-        nap_time(300)
+        alarm_payload = {'ALARM': 'VEML7700 exception occured'}
+        push_mqtt_alarm(alarm_payload)
+        nap_time(180)
 
 # read max17048 battery monitor
 def read_batt():
@@ -145,7 +184,9 @@ def read_batt():
         return(bat_volt, bat_perc)
     except Exception as e:
         print("Failed to read battery\n", e)
-        nap_time(300)
+        alarm_payload = {'ALARM': 'Max17048 exception occured'}
+        push_mqtt_alarm(alarm_payload)
+        nap_time(180)
 
 # Calculate Wind Direction and return as a a string
 def calculate_wind_direction():
@@ -239,30 +280,20 @@ def baro_atmos(value, temp):
     atmosP = value * (1 - (0.0065 * h / (temp + 0.0065 * h + 273.15))) ** -5.257
     return(atmosP)
 
-connect_wifi()
-pool = socketpool.SocketPool(wifi.radio)
+def is_safe(lux, windspeed, rain):
+    if (lux < 5 and windspeed < 10 and rain == 0):
+        safeFlag = "SAFE"
+    else:
+        safeFlag = "UNSAFE"
+    return(safeFlag)
 
 # synchronise rtc with ntp
-try:
-    ntp = adafruit_ntp.NTP(pool, tz_offset = MY_TZ_OFFSET)
-    rtc.RTC().datetime = ntp.datetime
-except Exception as e:
-    print("Could not retreive RTC, falling back to system time\n", e)
-    rtc.RTC().datetime = rtc.RTC().datetime # fallback
-
-# set up a MQTT Client
-mqtt_client = MQTT.MQTT(
-    broker = os.getenv('BROKER_IP'),
-    port = os.getenv('BROKER_PORT'),
-    username = os.getenv('BROKER_USR'),
-    password = os.getenv('BROKER_PASSWD'),
-    socket_pool = pool)
-
-# connect callback handlers to mqtt_client
-mqtt_client.on_connect = connect
-mqtt_client.on_disconnect = disconnect
-mqtt_client.on_publish = publish
-gc.collect()
+#try:
+#    ntp = adafruit_ntp.NTP(pool, tz_offset = MY_TZ_OFFSET)
+#    rtc.RTC().datetime = ntp.datetime
+#except Exception as e:
+#    print("Could not retreive RTC, falling back to system time\n", e)
+#    rtc.RTC().datetime = rtc.RTC().datetime # fallback
 
 start_time = time.time()
 while time.time() - start_time <= RECORD_INT:
@@ -276,14 +307,15 @@ atmosPr = baro_atmos(bmeDat[2], bmeDat[0])
 gc.collect()
 lightDat = read_light()
 batDat = read_batt()
-now = time.localtime()
+# now = time.localtime()
 rainfall = round(rainCount * BUCKET_SIZE, 3)
 windHeading = calculate_wind_direction()
 measuredWind = round(calculate_speed(windCount, RECORD_INT, RADIUS), 2)
-timestamp = "{0:04d}-{1:02d}-{2:02d} {3:02d}:{4:02d}:{5:02d}".format(now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
+# timestamp = "{0:04d}-{1:02d}-{2:02d} {3:02d}:{4:02d}:{5:02d}".format(now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
 freemem = gc.mem_free()
+safeStatus = is_safe(lightDat[1], measuredWind, rainfall)
 
-payload = {'DATETIME': timestamp,
+payload = {#'DATETIME': timestamp,
            'TEMP': bmeDat[0],
            'DEWPNT': dewpnt,
            'HUMID': bmeDat[1],
@@ -296,14 +328,15 @@ payload = {'DATETIME': timestamp,
            'RAIN': rainfall,
            'WINDSPEED': measuredWind,
            'BATVOLT': batDat[0],
-           'BATPERC': batDat[1]
+           'BATPERC': batDat[1],
+           'SAFESTAT': safeStatus
            }
 # print(payload)
 push_mqtt(payload)
 
 rainCount = 0
 windCount = 0
-del(bmeDat, lightDat, now, timestamp, freemem, payload, windHeading)
+del(bmeDat, lightDat, dewpnt, freemem, payload, windHeading, measuredWind, atmosPr, batDat, rainfall, safeStatus)
 gc.collect()
 take_nap(REPORTING_INT)
 
