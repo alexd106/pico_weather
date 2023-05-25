@@ -1,15 +1,16 @@
 # pico_weather
 
-Raspberry pi pico W based weather station.
+Raspberry pi pico W based solar powered weather station.
 
 Measures various weather (wind speed and direction, temperature, pressure, humidity, rainfall),  environmental (dew point, light intensity) and system (battery voltage and status, free memory) variables and pushes readings via MQTT. 
 
 Works with the following sensors:
 
-- Adafruit BME280 temperature, pressure and humidity sensor
-- Adafruit Veml7700 light sensor
-- Adafruit Max17048 LiPoly fuel gauge
-- Pimoroni Anemometer, wind vane and rain gauge
+- [Adafruit BME280](https://www.adafruit.com/product/2652) temperature, pressure and humidity sensor
+- [Adafruit Veml7700](https://learn.adafruit.com/adafruit-veml7700/overview) light sensor
+- [Adafruit Max17048](https://www.adafruit.com/product/5580) LiPoly fuel gauge
+- [Sparkfun](https://www.sparkfun.com/products/15901) anemometer, wind vane and rain gauge
+
 
 MQTT messages captured via Node-Red and visualised in Grafana.
 
