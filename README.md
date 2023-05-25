@@ -14,6 +14,6 @@ Works with the following sensors:
 
 MQTT messages captured via Node-Red and visualised in Grafana.
 
-Adafruit CircuitPython 8.0.5 on 2023-03-31; Raspberry Pi Pico W with rp2040
+Adafruit CircuitPython 8.0.5 2023-03-31; Raspberry Pi Pico W with rp2040
 
 

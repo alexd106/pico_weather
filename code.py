@@ -3,12 +3,13 @@ Raspberry pi Pico W weather station
 Circuitpython 8.05
 version: 0.4
 Author: AD
-2023-05-21
+2023-05-25
 
 Collect sensor data and send to MQTT broker on raspberry pi using MiniMQTT
 TODO: Add loging?
 TODO: Add RTC?
 """
+
 import board
 import os
 import socketpool
@@ -16,14 +17,14 @@ import wifi
 import alarm
 import time
 import gc
-import adafruit_veml7700
 from math import pi
 from digitalio import DigitalInOut, Direction, Pull
 from analogio import AnalogIn
-import adafruit_ntp
+# import adafruit_ntp
+# import rtc
 from busio import I2C
 from json import dumps
-import rtc
+import adafruit_veml7700
 from adafruit_bme280 import basic as adafruit_bme280
 import adafruit_max1704x
 from microcontroller import reset
@@ -331,6 +332,7 @@ payload = {#'DATETIME': timestamp,
            'BATPERC': batDat[1],
            'SAFESTAT': safeStatus
            }
+
 # print(payload)
 push_mqtt(payload)
 
