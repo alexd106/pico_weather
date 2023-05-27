@@ -1,9 +1,9 @@
 """
 Raspberry pi Pico W weather station
 Circuitpython 8.05
-version: 0.4
+version: 0.5
 Author: AD
-2023-05-25
+2023-05-27
 
 Collect sensor data and send to MQTT broker on raspberry pi using MiniMQTT
 TODO: Add loging?
@@ -20,13 +20,13 @@ import gc
 from math import pi
 from digitalio import DigitalInOut, Direction, Pull
 from analogio import AnalogIn
-# import adafruit_ntp
-# import rtc
+import rtc
 from busio import I2C
 from json import dumps
 import adafruit_veml7700
 from adafruit_bme280 import basic as adafruit_bme280
 import adafruit_max1704x
+# import adafruit_ds3231
 from microcontroller import reset
 import adafruit_minimqtt.adafruit_minimqtt as MQTT
 
@@ -39,7 +39,6 @@ RADIUS = 9.0
 BUCKET_SIZE = 0.2794
 RECORD_INT = 180 # interval to calculate wind speed and rainfall 60, 120, 180
 REPORTING_INT = 330 # reporting interval 510, 450, 330
-# MY_TZ_OFFSET = 0 # GMT
 
 bme280_addr = 0x77
 veml_addr = 0x10
@@ -63,7 +62,7 @@ def connect_wifi():
         print("Connected to WiFi")
     except Exception as e:
         print("Cannot connect to wifi\n", e)
-        take_nap(180)
+        take_nap(120)
 
 def push_mqtt(payload):
     try:
@@ -129,6 +128,7 @@ except Exception as e:
 try:
     i2c2 = I2C(scl = board.GP19, sda = board.GP18, frequency = 200_000)
     maxBat = adafruit_max1704x.MAX17048(i2c2, max_addr)  # address = 0x36
+    # ds3231 = adafruit_ds3231.DS3231(i2c2) # default 0x68
 except Exception as e:
     print("I2C2 exception occured!\n", e)
     alarm_payload = {'ALARM': 'I2C2 exception occured'}
@@ -282,19 +282,18 @@ def baro_atmos(value, temp):
     return(atmosP)
 
 def is_safe(lux, windspeed, rain):
-    if (lux < 5 and windspeed < 10 and rain == 0):
+    if (lux < 1 and windspeed < 10 and rain == 0):
         safeFlag = "SAFE"
     else:
         safeFlag = "UNSAFE"
     return(safeFlag)
 
-# synchronise rtc with ntp
-#try:
-#    ntp = adafruit_ntp.NTP(pool, tz_offset = MY_TZ_OFFSET)
-#    rtc.RTC().datetime = ntp.datetime
-#except Exception as e:
-#    print("Could not retreive RTC, falling back to system time\n", e)
-#    rtc.RTC().datetime = rtc.RTC().datetime # fallback
+# try:
+#     rtc.RTC().datetime = ds3231.datetime
+#     print(rtc.RTC().datetime)
+# except Exception as e:
+#     print("Could not retreive RTC datetime\n", e)
+#     rtc.RTC().datetime = rtc.RTC().datetime # fallback
 
 start_time = time.time()
 while time.time() - start_time <= RECORD_INT:
