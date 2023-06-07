@@ -175,7 +175,7 @@ def read_light():
         print("Failed to read VEML7700 sensor\n", e)
         alarm_payload = {'ALARM': 'VEML7700 exception occured'}
         push_mqtt_alarm(alarm_payload)
-        nap_time(180)
+        take_nap(180)
 
 # read max17048 battery monitor
 def read_batt():
@@ -187,7 +187,7 @@ def read_batt():
         print("Failed to read battery\n", e)
         alarm_payload = {'ALARM': 'Max17048 exception occured'}
         push_mqtt_alarm(alarm_payload)
-        nap_time(180)
+        take_nap(180)
 
 # Calculate Wind Direction and return as a a string
 def calculate_wind_direction():
